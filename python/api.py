@@ -4,6 +4,7 @@ import random
 import requests
 import numpy
 import json
+import scipy.optimize as sco
 
 app = Flask(__name__)
 
@@ -11,8 +12,6 @@ stocks_example = {
     "stocks": ["AAPL", "GOOG", "TSLA"],
     "risk_score": 80
 }
-
-jsonified = jsonify(stocksExample)
 
 trading_days = 252
 
@@ -23,6 +22,8 @@ def optimize():
 
     assert(request.is_json)
     buffer = request.get_json()
+
+    jsonified = jsonify(stocks_example)
 
     stocks = buffer['stocks']
     risk_score = buffer['risk_score']
@@ -70,9 +71,61 @@ def optimize():
     returns = numpy.array(returns)
     risks = numpy.array(risks)
 
-
+    blackRock_query = []
     data = {
+        "weighting": [],
+        "return": 0,
+        "risk": 0,
+        "sharpe_ratio": 0
     }
+
+    if risk_score > 70:
+        highest_return_weighting = weights[returns.tolist().index(max(returns))]
+        for i in range(0, num_stocks):
+            blackRock_query += stock + "~" + str(highest_return_weighting[i]) + "|"
+        portfolio_analysis = requests.get("https://www.blackrock.com/tools/hackathon/portfolio-analysis?calculateExposures=true&calculatePerformance=true&positions=" + blackRock_query).json()
+        portfolio_analysis = portfolio_analysis["resultMap"]["PORTFOLIOS"][0]["portfolios"][0]["returns"]["latestPerf"]
+        data["weighting"] = highest_return_weighting.tolist()
+    elif risk_score >= 30:
+        return_over_risk_weighting = weights[sharpe_ratios.tolist().index(max(sharpe_ratios))]
+        for i in range(0, num_stocks):
+            blackRock_query += stock + "~" + str(return_over_risk_weighting[i]) + "|"
+        portfolio_analysis = requests.get("https://www.blackrock.com/tools/hackathon/portfolio-analysis?calculateExposures=true&calculatePerformance=true&positions=" + blackRock_query).json()
+        portfolio_analysis = portfolio_analysis["resultMap"]["PORTFOLIOS"][0]["portfolios"][0]["returns"]["latestPerf"]
+        data["weighting"] = return_over_risk_weighting.tolist()
+    elif risk_score >= 0:
+        lowest_risk_weighting = weights[risks.tolist().index(min(risks))]
+        for i in range(0, num_stocks):
+            blackRock_query += stock + "~" + str(lowest_risk_weighting[i]) + "|"
+        portfolio_analysis = requests.get("https://www.blackrock.com/tools/hackathon/portfolio-analysis?calculateExposures=true&calculatePerformance=true&positions=" + blackRock_query).json()
+        portfolio_analysis = portfolio_analysis["resultMap"]["PORTFOLIOS"][0]["portfolios"][0]["returns"]["latestPerf"]
+        data["weighting"] = lowest_risk_weighting.tolist()
+
+    data["return"] = portfolio_analysis["oneYear"]
+    data["risk"] = portfolio_analysis["oneYearRisk"]
+    data["sharpe_ratio"] = portfolio_analysis["oneYearSharpeRatio"]
+
+    """
+    highest_return = {}
+    lowest_risk = {}
+    highest_sharpe = {}
+
+    lowest_risk["risk"]=min(port_variance)
+    lowestRisk["sharpe"]=port_sharpe[port_variance.tolist().index(min(port_variance))]
+    lowestRisk["return"]=port_returns[port_variance.tolist().index(min(port_variance))]
+
+    highestSharpe["risk"]=port_variance[port_sharpe.index(max(port_sharpe))]
+    highestSharpe["sharpe"]=max(port_sharpe)
+    highestSharpe["return"]=port_returns[port_sharpe.index(max(port_sharpe))]
+
+    highestReturn["risk"]=port_variance[port_returns.tolist().index(max(port_returns))]
+    highestReturn["sharpe"]=port_sharpe[port_returns.tolist().index(max(port_returns))]
+    highestReturn["return"]=max(port_returns)
+
+    print(portfolio_analysis)
+    """
+
+
 
     resp = jsonify(data)
 
