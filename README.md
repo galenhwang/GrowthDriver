@@ -27,3 +27,5 @@ Game Design/Decisions, planning game protocols, Google Cloud Platform, Machine L
 ## What's next for GrowthDriver
 
 Taking on the biggest firms in the world.
+
+DevPost project link can be found here: https://devpost.com/software/growthdriver
